@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 from pathlib2 import Path
 
-MIN_COMMOM_MOVIES_THRESOULD = 3
+MIN_COMMOM_MOVIES_THRESOULD = 10
 
 DATA_PATH = Path('./data/rating.csv')
-TRAIN_SIZE = int(1e4)
+TRAIN_SIZE = int(1e5)
 
 
 def addDeviationData(df: pd.DataFrame):
@@ -32,7 +32,7 @@ def getCommomMovies(data, userId1, userId2):
 
 
 def cosSimilarity(v1: np.ndarray, v2: np.ndarray):
-    if (np.linalg.norm(v1) < 0.0000001 or np.linalg.norm(v1) < 0.0000001):
+    if np.linalg.norm(v1) * np.linalg.norm(v2) < 0.00001:
         return 1 if np.array_equal(v1, v2) else 0
 
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
