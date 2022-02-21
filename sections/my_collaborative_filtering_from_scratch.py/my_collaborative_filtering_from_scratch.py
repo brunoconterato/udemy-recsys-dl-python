@@ -1,9 +1,11 @@
+import math
 from typing import List
 import pandas as pd
 import numpy as np
 from pathlib2 import Path
+from tqdm import tqdm
 
-MIN_COMMOM_MOVIES_THRESOULD = 10
+MIN_COMMOM_MOVIES_THRESOULD = 20
 
 DATA_PATH = Path('./data/rating.csv')
 TRAIN_SIZE = int(1e5)
@@ -13,7 +15,7 @@ def addDeviationData(df: pd.DataFrame):
     df_cp = df.copy()
     df_cp["dev_rating"] = 0
     userIds = df_cp.index.unique(level=0).values.tolist()
-    for userId in userIds:
+    for userId in tqdm(userIds):
         userId_df = df_cp[df_cp.index.get_level_values(level=0) == userId]
         user_mean_score = userId_df["rating"].mean()
         df_cp.loc[userId, "dev_rating"] = (
@@ -67,37 +69,54 @@ class CollaborativeFilteringModel:
 
     @staticmethod
     def _getWeightsIndex(userId1, userId2):
-        return (userId1, userId2) if userId1 > userId2 else (userId2, userId1)
+        return (userId1, userId2) if userId1 < userId2 else (userId2, userId1)
 
-    def fitAll(self, data: pd.DataFrame):
+    def fitAll(self, data: pd.DataFrame, total_ops):
         self.weights = {}
         self.nonZeroWeightsCoount = 0
         self. totalWeights = 0
 
         userIds = data.index.unique(level="userId").values
-        for i, userId_1 in enumerate(userIds[:-1]):
-            for userId_2 in userIds[i+1:]:
-                self.weights[self._getWeightsIndex(userId_1, userId_2)] = calcSimilarity(
-                    data, userId_1, userId_2)
-                self. totalWeights += 1
-                if self.weights[self._getWeightsIndex(userId_1, userId_2)] > 0:
-                    self.nonZeroWeightsCoount += 1
+        with tqdm(total=total_ops) as pbar:
+            for i, userId_1 in enumerate(userIds[:-1]):
+                for userId_2 in userIds[i+1:]:
+                    self.weights[self._getWeightsIndex(userId_1, userId_2)] = calcSimilarity(
+                        data, userId_1, userId_2)
+                    self. totalWeights += 1
+                    if self.weights[self._getWeightsIndex(userId_1, userId_2)] > 0:
+                        self.nonZeroWeightsCoount += 1
+                    pbar.update(1)
 
     def predict(self, data: pd.DataFrame, userId, movieId):
         print(f"\nPredicting rating for user {userId} and movie {movieId}...")
         if (userId, movieId) in data.index:
             print(
-                f'Rating (deviation) user gave to movie {data.loc[userId, movieId]["dev_rating"]}...')
+                f'Rating (deviation) user gave to movie: {data.loc[userId, movieId]["dev_rating"]}')
         else:
             print(f'User {userId} did not rating movie {movieId} yet')
 
         usersRated = getUsersThatRatedMovie(data, movieId)
-        usersRated.remove(userId)
+        if userId in usersRated:
+            usersRated.remove(userId)
 
-        predictedRating = \
-            np.array([self.weights[self._getWeightsIndex(userId, i)] * train_data.loc[(i, movieId)]["dev_rating"] for i in usersRated]).sum() / \
-            np.array([self.weights[self._getWeightsIndex(userId, i)]
-                     for i in usersRated]).sum()
+        try:
+            predictedRating = \
+                np.array([self.weights[self._getWeightsIndex(userId, i)] * data.loc[(i, movieId)]["dev_rating"] for i in usersRated]).sum() / \
+                np.array([self.weights[self._getWeightsIndex(userId, i)]
+                        for i in usersRated]).sum()
+        except:
+            pass
+
+        # if math.isnan(predictedRating):
+        #     print('we have a nan here')
+        #     for i in usersRated:
+        #         print(f'Index: {self._getWeightsIndex(userId, i)}')
+        #         print(f'Weights: {self.weights[self._getWeightsIndex(userId, i)]}')
+        #         print(f'Rating (deviation): {data.loc[(i, movieId)]["dev_rating"]}')
+        #     print(f'usersRated: {usersRated}')
+        #     print(f'First sum: {np.array([self.weights[self._getWeightsIndex(userId, i)] * data.loc[(i, movieId)]["dev_rating"] for i in usersRated]).sum()}')
+        #     print(f'Second sum: {np.array([self.weights[self._getWeightsIndex(userId, i)] for i in usersRated]).sum()}')
+        #     print(f'predictedRating: {predictedRating}')
 
         print(
             f'Predicted rating (deviation) for user {userId} and movie {movieId}: {predictedRating}\n')
@@ -112,11 +131,22 @@ train_data.dropna(axis=0, inplace=True)
 print('Adding deviations to data...')
 train_data = addDeviationData(train_data)
 
+userIds = train_data.index.unique(level=0).values
+movieIds = train_data.index.unique(level=1).values
+
 print('Fitting model...')
 model = CollaborativeFilteringModel()
-model.fitAll(train_data)
+model.fitAll(train_data, total_ops=len(userIds)**2-len(userIds))
 print(f'Number of weights: {model.totalWeights}')
 print(
     f'Non zero weights found: {model.nonZeroWeightsCoount} ({100 * model.nonZeroWeightsCoount / model.totalWeights}%)')
 
+
+
 model.predict(train_data, 1, 29)
+
+for i in range(100):
+    userId = np.random.choice(userIds)
+    moviesWatched = getMoviesByUserId(train_data, userId)
+    movieId = np.random.choice(moviesWatched)
+    model.predict(train_data, userId, movieId)
