@@ -8,10 +8,11 @@ from utils.dataUtils import loadData
 from utils.helpers import addDeviationData, getMovieIds, getMovieIndex, getMoviesByUserId, getUserIds, getUserIndex, getUsersThatRatedMovie
 
 K = 5
-NROWS = int(1e4)
-T = 20
+T = 10
+TOP_USERS=1000
+TOP_MOVIES=200
 
-data = loadData(nrows=NROWS)
+data = loadData(mode="top", topUsers=TOP_USERS, topMovies=TOP_MOVIES)
 data = addDeviationData(data)
 
 N = len(getUserIds(data))
@@ -59,7 +60,7 @@ def getTotalLoss(data):
         for movieId in getMoviesByUserId(data, userId):
             j = getMovieIndex(data, movieId=movieId)
             l += (data.loc[userId, movieId]
-                  ["dev_rating"] - np.dot(W[i], U[j])) ** 2
+                  ["dev_rating"] - np.inner(W[i], U[j])) ** 2
     return l
 
 
@@ -76,7 +77,7 @@ losses = []
 def fitWandU(data):
     total_epoch_ops = len(getUserIds(data)) + len(getMovieIds(data))
     for t in range(T):
-        print(f'\n\n Starting iteration {t + 1} out of {T}')
+        print(f'\n\nIteration {t + 1} out of {T}:')
         with tqdm(total=total_epoch_ops) as pbar:
             for userId in getUserIds(data):
                 i = getUserIndex(data, userId=userId)
@@ -93,7 +94,7 @@ def fitWandU(data):
 
 
 def getReccomendation4(data, userId, movieId):
-    return np.dot(
+    return np.inner(
         W[getUserIndex(data, userId=userId), :],
         U[getMovieIndex(data, movieId=movieId), :]
     )

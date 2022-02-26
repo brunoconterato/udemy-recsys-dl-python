@@ -26,6 +26,7 @@ def getMovieIndex(df: pd.DataFrame, movieId) -> np.ndarray:
 
 
 def addDeviationData(df: pd.DataFrame):
+    print("Adding deviation data...")
     df_cp = df.copy()
     df_cp["dev_rating"] = 0
     userIds = df_cp.index.unique(level=0).values.tolist()

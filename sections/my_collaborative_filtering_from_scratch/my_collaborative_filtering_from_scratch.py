@@ -79,7 +79,7 @@ class CollaborativeFilteringModel:
 
 def run():
     print('Loading data...')
-    train_data: pd.DataFrame = loadData(nrows=TRAIN_SIZE)
+    train_data: pd.DataFrame = loadData(mode="byFileRows", nrows=TRAIN_SIZE)
 
     print('Adding deviations to data...')
     train_data = addDeviationData(train_data)
