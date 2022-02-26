@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from utils.dataUtils import loadData
 from utils.helpers import addDeviationData, getMovieIds, getMovieIndex, getMoviesByUserId, getUserIds, getUserIndex, getUsersThatRatedMovie
 
-K = 5
-T = 10
+K = 10
+T = 25
 TOP_USERS=1000
 TOP_MOVIES=200
 
@@ -55,13 +55,15 @@ def solveForUj(data, movieId):
 
 def getTotalLoss(data):
     l = 0.0
+    n = 0
     for userId in getUserIds(data):
         i = getUserIndex(data, userId=userId)
         for movieId in getMoviesByUserId(data, userId):
             j = getMovieIndex(data, movieId=movieId)
+            n += 1
             l += (data.loc[userId, movieId]
                   ["dev_rating"] - np.inner(W[i], U[j])) ** 2
-    return l
+    return l / n
 
 
 def getLoss(data, userId, movieId):
@@ -89,8 +91,12 @@ def fitWandU(data):
                 U[j, :] = solveForUj(data, movieId=movieId)
                 pbar.update(1)
 
-            print('W[66, :]', W[66, :])
-            print('U[66, :]', U[66, :])
+            print('W[3, :]', W[3, :])
+            print('U[3, :]', U[3, :])
+            loss = getTotalLoss(data)
+            print(f'loss: {loss}')
+            losses.append(loss)
+
 
 
 def getReccomendation4(data, userId, movieId):
@@ -109,7 +115,8 @@ def plotLoss(losses):
 def run():
     userIds = getUserIds(data)
     fitWandU(data)
-    getReccomendation4(data, 1, 29)
+    # getReccomendation4(data, 1, 29)
+    plotLoss(losses=losses)
     # plotLoss(losses)
     # for i in range(2, 100):
     #     print(f'\n\nIteration {i} out of 100...')
