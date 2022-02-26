@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from utils.dataUtils import loadData
 from utils.helpers import addDeviationData, getMovieIds, getMovieIndex, getMoviesByUserId, getUserIds, getUserIndex, getUsersThatRatedMovie
 
-K = 10
-NROWS = int(1e5)
+K = 5
+NROWS = int(1e4)
 T = 20
 
 data = loadData(nrows=NROWS)
@@ -18,40 +18,38 @@ N = len(getUserIds(data))
 M = len(getMovieIds(data))
 
 
-W = 5 * np.random.random((N, K))
-U = 5 * np.random.random((M, K))
+W = 2 * np.random.random((N, K)) - 1
+U = 2 * np.random.random((M, K)) - 1
 
 
 def solveForWi(data, userId):
-    userIndex = getUserIndex(data, userId=userId)
     movieIds = getMoviesByUserId(data, userId)
 
-    A = np.zeros((K, K))
-    B = np.zeros((K, ))
+    A = np.zeros((K, K), dtype=np.float64)
+    B = np.zeros((K, ), dtype=np.float64)
     for movieId in movieIds:
         movieIndex = getMovieIndex(data, movieId=movieId)
         u_j = U[movieIndex, :]
 
         r_ij = data.loc[(userId, movieId)]["dev_rating"]
-        A = np.add(A, np.outer(u_j, u_j))
+        A += np.outer(u_j, u_j)
         B += r_ij * u_j
-    W[userIndex, :] = np.linalg.solve(A, B)
+    return np.linalg.solve(A, B)
 
 
 def solveForUj(data, movieId):
-    movieIndex = getMovieIndex(data, movieId=movieId)
     userIds = getUsersThatRatedMovie(data, movieId=movieId)
 
-    A = np.zeros((K, K))
-    B = np.zeros((K, ))
+    A = np.zeros((K, K), dtype=np.float64)
+    B = np.zeros((K, ), dtype=np.float64)
     for userId in userIds:
         userIndex = getUserIndex(data, userId=userId)
         w_i = W[userIndex, :]
 
         r_ij = data.loc[(userId, movieId)]["dev_rating"]
-        A = np.add(A, np.outer(w_i, w_i))
+        A += np.outer(w_i, w_i)
         B += r_ij * w_i
-    U[movieIndex, :] = np.linalg.solve(A, B)
+    return np.linalg.solve(A, B)
 
 
 def getTotalLoss(data):
@@ -60,36 +58,45 @@ def getTotalLoss(data):
         i = getUserIndex(data, userId=userId)
         for movieId in getMoviesByUserId(data, userId):
             j = getMovieIndex(data, movieId=movieId)
-            l += (data.loc[userId, movieId]["dev_rating"] - np.dot(W[i], U[j])) ** 2
+            l += (data.loc[userId, movieId]
+                  ["dev_rating"] - np.dot(W[i], U[j])) ** 2
     return l
+
 
 def getLoss(data, userId, movieId):
     i = getUserIndex(data, userId=userId)
     j = getMovieIndex(data, movieId=movieId)
-    l = (data.loc[userId, movieId]["dev_rating"] - np.dot(W[i], U[j])) ** 2
+    l = (data.loc[userId, movieId]["dev_rating"] - np.inner(W[i, :], U[j, :])) ** 2
     return l
 
 
 losses = []
 
-def getReccomendation4(data, userId, movieId):
-    # print('W[i, :]',
-    #         W[getUserIndex(data, userId), :])
-    # print('U[:, j]',
-    #       U[:, getMovieIndex(data, movieId)])
-    for t in tqdm(range(T)):
-        solveForWi(data, userId=userId)
-        solveForUj(data, movieId=movieId)
-        # print('W[i, :]',
-        #       W[getUserIndex(data, userId), :])
-        # print('U[:, j]',
-        #       U[:, getMovieIndex(data, movieId)])
-        if (t > 0):
-            losses.append(getLoss(data, userId, movieId))
 
-    w_i = W[getUserIndex(data, userId=userId), :]
-    u_j = U[getMovieIndex(data, movieId=movieId), :]
-    return np.dot(w_i.T, u_j.T)
+def fitWandU(data):
+    total_epoch_ops = len(getUserIds(data)) + len(getMovieIds(data))
+    for t in range(T):
+        print(f'\n\n Starting iteration {t + 1} out of {T}')
+        with tqdm(total=total_epoch_ops) as pbar:
+            for userId in getUserIds(data):
+                i = getUserIndex(data, userId=userId)
+                W[i, :] = solveForWi(data, userId=userId)
+                pbar.update(1)
+
+            for movieId in getMovieIds(data):
+                j = getMovieIndex(data, movieId=movieId)
+                U[j, :] = solveForUj(data, movieId=movieId)
+                pbar.update(1)
+
+            print('W[66, :]', W[66, :])
+            print('U[66, :]', U[66, :])
+
+
+def getReccomendation4(data, userId, movieId):
+    return np.dot(
+        W[getUserIndex(data, userId=userId), :],
+        U[getMovieIndex(data, movieId=movieId), :]
+    )
 
 
 def plotLoss(losses):
@@ -97,10 +104,12 @@ def plotLoss(losses):
     plt.plot(losses)
     plt.show()
 
+
 def run():
     userIds = getUserIds(data)
+    fitWandU(data)
     getReccomendation4(data, 1, 29)
-    plotLoss(losses)
+    # plotLoss(losses)
     # for i in range(2, 100):
     #     print(f'\n\nIteration {i} out of 100...')
     #     userId = np.random.choice(userIds)
@@ -115,4 +124,3 @@ def run():
     #     predictedRating = getReccomendation4(data, userId, movieId)
     #     print(
     #         f'Predicted rating (deviation) for user {userId} and movie {movieId}: {predictedRating}\n')
-
