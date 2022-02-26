@@ -2,6 +2,29 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
+
+def getUserIds(df: pd.DataFrame) -> np.ndarray:
+    userIds = df.index.unique(level=0).values
+    userIds.sort()
+    return userIds
+
+
+def getMovieIds(df: pd.DataFrame) -> np.ndarray:
+    movieIds = df.index.unique(level=1).values
+    movieIds.sort()
+    return movieIds
+
+
+def getUserIndex(df: pd.DataFrame, userId) -> np.ndarray:
+    i, = np.where(getUserIds(df) == userId)
+    return i[0]
+
+
+def getMovieIndex(df: pd.DataFrame, movieId) -> np.ndarray:
+    i, = np.where(getMovieIds(df) == movieId)
+    return i[0]
+
+
 def addDeviationData(df: pd.DataFrame):
     df_cp = df.copy()
     df_cp["dev_rating"] = 0
@@ -33,9 +56,3 @@ def cosSimilarity(v1: np.ndarray, v2: np.ndarray):
 
 def getUsersThatRatedMovie(df: pd.DataFrame, movieId):
     return df[df.index.get_level_values(1) == movieId].index.get_level_values(0).values.tolist()
-
-def getUserIds(df: pd.DataFrame) -> np.ndarray:
-    return df.index.unique(level=0).values
-
-def getMovieIds(df: pd.DataFrame) -> np.ndarray:
-    return df.index.unique(level=1).values

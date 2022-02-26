@@ -7,7 +7,7 @@ from utils.helpers import addDeviationData, cosSimilarity, getCommomMovies, getM
 
 MIN_COMMOM_MOVIES_THRESOULD = 20
 
-TRAIN_SIZE = int(1e5)
+TRAIN_SIZE = int(1e4)
 
 
 def calcSimilarity(data: pd.DataFrame, userId1, userId2):
